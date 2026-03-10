@@ -11,7 +11,7 @@ def plot_age_group_comparison():
 
     max_age_groups = 16
 
-    # 定义颜色和标记样式
+
     colors = ['#8AB4D6', '#FFB87A', '#8CCB8C', '#FF7F7F']
     markers = ['o', 's', '^', 'D']
 
@@ -59,9 +59,7 @@ def plot_age_group_comparison():
             if row < len(age_axes) and col < len(age_axes[row]):
                 ax = age_axes[row][col]
 
-                # 尝试不同的列名格式
-                theory_col_name = None
-                sim_col_name = None
+
 
                 theory_col_name = f'R{age_group + 1}'
 
@@ -87,9 +85,9 @@ def plot_age_group_comparison():
                     ax.set_title(f'Age Group {age_group}', fontsize=14, fontweight='bold')
 
 
-                if row == 3:  # 最后一行显示x轴标签
+                if row == 3:
                     ax.set_xlabel(r'$\beta$', fontsize=12)
-                if col == 0:  # 第一列显示y轴标签
+                if col == 0:
                     ax.set_ylabel('Final epidemic size', fontsize=12)
 
 
@@ -100,7 +98,7 @@ def plot_age_group_comparison():
 
 
     plt.suptitle('Comparison of Theoretical vs Simulation Results by Age Group\nfor Germany, Uganda, Qatar, and Monaco',
-                 fontsize=16, fontweight='bold', y=0.98)  # 增大字体
+                 fontsize=16, fontweight='bold', y=0.98)
 
     legend_fig, legend_ax = plt.subplots(figsize=(10, 2))
     legend_ax.axis('off')
@@ -118,7 +116,7 @@ def plot_age_group_comparison():
 
 
     legend_ax.legend(handles=legend_elements, loc='center', ncol=4,
-                     fontsize=14, frameon=True, fancybox=True)  # 增大字体
+                     fontsize=14, frameon=True, fancybox=True)
 
     plt.tight_layout()
 

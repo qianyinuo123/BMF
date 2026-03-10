@@ -14,20 +14,20 @@ def load_and_generate_intra_group_heatmap(country_name, gexf_folder="gexf_networ
     file_path = os.path.join(gexf_folder, f"{country_name}.gexf")
 
     if not os.path.exists(file_path):
-        print(f"❌ File not found: {file_path}")
+        print(f" File not found: {file_path}")
         return False
 
     try:
 
         G = nx.read_gexf(file_path)
-        print(f"✅ Loaded network for {country_name}")
+        print(f"Loaded network for {country_name}")
 
 
         create_final_intra_group_heatmap(G, country_name, output_folder)
         return True
 
     except Exception as e:
-        print(f"❌ Error processing {country_name}: {e}")
+        print(f"Error processing {country_name}: {e}")
         return False
 
 

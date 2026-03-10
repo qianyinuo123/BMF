@@ -7,11 +7,10 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-# ================= 路径设置 =================
 GEXF_DIR = Path("gexf_networks")
 OUTPUT_FILE = Path("degree_distribution_comparison.png")
 
-# ================= 国家配置 =================
+
 COUNTRIES = [
     {"name": "Uganda", "color": '#2E86AB'},
     {"name": "Qatar", "color": '#A23B72'},
@@ -19,7 +18,6 @@ COUNTRIES = [
     {"name": "Germany", "color": '#C73E1D'},
 ]
 
-# ================= 读取网络并计算度 =================
 def load_degrees(country_name):
 
     possible_files = [
@@ -52,7 +50,6 @@ def load_degrees(country_name):
     return np.array(degrees)
 
 
-# ================= 拟合分布 =================
 def fit_distributions(degrees):
 
     mu = np.mean(degrees)

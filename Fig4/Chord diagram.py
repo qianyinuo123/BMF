@@ -30,7 +30,7 @@ def plot_chord_diagram(G, country, output_folder):
     n_groups = 16
     connection_matrix = np.zeros((n_groups, n_groups))
 
-    # 统计组间连接
+
     for edge in G.edges():
         i = int(node_groups[edge[0]])
         j = int(node_groups[edge[1]])
@@ -168,7 +168,7 @@ def main():
         file_path = os.path.join(gexf_folder, f"{country}.gexf")
 
         if not os.path.exists(file_path):
-            print(f"❌ File not found: {file_path}")
+            print(f"File not found: {file_path}")
             continue
 
         try:
@@ -179,7 +179,7 @@ def main():
                 success_count += 1
 
         except Exception as e:
-            print(f"❌ Error processing {country}: {e}")
+            print(f"Error processing {country}: {e}")
 
     print("=" * 50)
     print(f"🎉 Generated {success_count} chord diagrams")

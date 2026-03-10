@@ -42,7 +42,7 @@ def plot_age_group_comparison_two_simulations():
         beta_line    = df_line['Beta']
         beta_scatter = df_scatter['Beta']
 
-        # ================= 年龄组循环 =================
+
         for age_group in range(max_age_groups):
             row = age_group // 4
             col = age_group % 4
@@ -56,7 +56,7 @@ def plot_age_group_comparison_two_simulations():
             if col_name not in df_line.columns or col_name not in df_scatter.columns:
                 continue
 
-            # ===== 实线：Discrete_SIR（原 Simulation 线条风格）=====
+
             ax.plot(
                 beta_line,
                 df_line[col_name],

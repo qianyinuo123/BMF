@@ -88,7 +88,7 @@ def plot_age_group_comparison_two_simulations():
             ax.grid(True, alpha=0.3)
             ax.tick_params(axis='both', which='major', labelsize=10)
 
-    # ================= 总标题 =================
+
     plt.suptitle(
         'Comparison of Two Simulation Schemes by Age Group\n'
         'Discrete SIR with All Contacts vs Discrete SIR with No_work Contacts',
@@ -130,7 +130,7 @@ def plot_age_group_comparison_two_simulations():
         fancybox=True
     )
 
-    # ================= 保存 =================
+
     plt.tight_layout()
     plt.savefig('age_group_two_simulation_comparison.png', dpi=300, bbox_inches='tight')
     legend_fig.savefig('age_group_two_simulation_legend.png', dpi=300, bbox_inches='tight')
