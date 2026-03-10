@@ -17,7 +17,7 @@ def plot_age_group_comparison():
 
 
     fig = plt.figure(figsize=(18, 14))
-    gs = GridSpec(4, 4, figure=fig, hspace=0.25, wspace=0.2)  # 更紧凑的布局
+    gs = GridSpec(4, 4, figure=fig, hspace=0.25, wspace=0.2)
 
 
     age_axes = []
@@ -41,7 +41,6 @@ def plot_age_group_comparison():
             theory_data = theory_df
 
 
-        # 读取仿真数据
         sim_file = f"Discrete_SIR_{country}.csv"
         sim_data = None
         if os.path.exists(sim_file):
@@ -139,9 +138,6 @@ if __name__ == "__main__":
 
     print("=" * 60)
 
-    # 绘制所有年龄组
     plot_age_group_comparison()
 
 
-    print("=" * 60)
-    print("所有图表绘制完成！")
