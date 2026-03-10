@@ -21,7 +21,7 @@ SELECTED_COUNTRIES = ["Germany", "Uganda", "Qatar", "Monaco"]
 
 
 def plot_chord_diagram(G, country, output_folder):
-    print(f"🎨 Creating chord diagram for {country}...")
+    print(f"Creating chord diagram for {country}...")
 
 
     node_groups = nx.get_node_attributes(G, 'group')
@@ -116,7 +116,6 @@ def plot_chord_diagram(G, country, output_folder):
                           facecolor='white',
                           alpha=0.8))
 
-        # 显示组内人数
         if size > 0:
             ax.text(pos[0], pos[1], f'{size:,}',
                     ha='center', va='center',
@@ -153,7 +152,7 @@ def plot_chord_diagram(G, country, output_folder):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-    print(f"✅ Saved: {output_path}")
+    print(f"Saved: {output_path}")
     return True
 
 
