@@ -67,7 +67,7 @@ def fit_distributions(degrees):
     return poisson_lambda, r, p, mu, np.sqrt(sigma2)
 
 
-# ================= 生成图 =================
+
 def create_degree_distribution_plot(country_data):
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -143,7 +143,6 @@ def create_degree_distribution_plot(country_data):
     print(f"Figure saved to: {OUTPUT_FILE}")
 
 
-# ================= 主程序 =================
 def main():
 
     country_data = {}
