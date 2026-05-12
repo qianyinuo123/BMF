@@ -1,146 +1,105 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
-from matplotlib.gridspec import GridSpec
+import numpy as np
+import seaborn as sns
 
+# 读取数据（假设csv文件在当前目录）
+df = pd.read_csv('network_structure_comparison_interventions.csv')
 
-def plot_age_group_comparison_two_simulations():
+# 确保场景顺序（标签改为首字母大写）
+scenario_order = ['baseline', 'no_school', 'no_work']
+scenario_labels = {'baseline': 'Baseline', 'no_school': 'No_school', 'no_work': 'No_work'}
+df['scenario'] = pd.Categorical(df['scenario'], categories=scenario_order, ordered=True)
 
-    countries = ["Germany", "Uganda", "Qatar", "Monaco"]
-    max_age_groups = 16
+# 国家顺序
+countries = ['Germany', 'Monaco', 'Qatar', 'Uganda']
+df['country'] = pd.Categorical(df['country'], categories=countries, ordered=True)
 
-    colors  = ['#8AB4D6', '#FFB87A', '#8CCB8C', '#FF7F7F']
-    markers = ['o', 's', '^', 'D']
+# 颜色映射
+colors = {'baseline': '#1f77b4', 'no_school': '#ff7f0e', 'no_work': '#2ca02c'}
 
+# ================= 图1：分组柱状图（四个指标） =================
+metrics = [
+    ('cross_edge_ratio', 'Cross-age edge ratio', 0, 1),
+    ('avg_path_length', 'Average shortest path length', None, None),
+    ('mean_degree', 'Mean degree', None, None),
+    ('largest_comp_frac', 'Largest component fraction', 0.9, 1.0)
+]
 
-    fig = plt.figure(figsize=(18, 14))
-    gs = GridSpec(4, 4, figure=fig, hspace=0.25, wspace=0.2)
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+axes = axes.flatten()
 
-    age_axes = []
-    for row in range(4):
-        row_axes = []
-        for col in range(4):
-            age_idx = row * 4 + col
-            if age_idx < max_age_groups:
-                ax = fig.add_subplot(gs[row, col])
-                row_axes.append(ax)
-        age_axes.append(row_axes)
+for idx, (metric, label, ymin, ymax) in enumerate(metrics):
+    ax = axes[idx]
+    x = np.arange(len(countries))
+    width = 0.25
 
+    for i, scenario in enumerate(scenario_order):
+        values = []
+        for c in countries:
+            val = df[(df['country'] == c) & (df['scenario'] == scenario)][metric].values[0]
+            values.append(val)
+        bars = ax.bar(x + i * width, values, width, label=scenario_labels[scenario], color=colors[scenario])
+        # 添加数值标签
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate(f'{height:.3f}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=8)
 
-    for country_idx, country in enumerate(countries):
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(countries)
+    ax.set_ylabel(label)
+    if ymin is not None:
+        ax.set_ylim(bottom=ymin)
+    if ymax is not None:
+        ax.set_ylim(top=ymax)
+    ax.set_title('')   # 移除标题
+    ax.legend()
 
-        sim_line_file    = f"Discrete_SIR_{country}.csv"
-        sim_scatter_file = f"Discrete_SIR_{country}_all.csv"
+plt.tight_layout()
+plt.savefig('network_metrics_grouped_bars.png', dpi=300, bbox_inches='tight')
+plt.savefig('network_metrics_grouped_bars.pdf', bbox_inches='tight')
+plt.show()
 
-        if not os.path.exists(sim_line_file) or not os.path.exists(sim_scatter_file):
+# ================= 图2：跨年龄边比例相对变化柱状图 =================
+# 计算相对变化百分比
+change_data = []
+for c in countries:
+    base = df[(df['country'] == c) & (df['scenario'] == 'baseline')]['cross_edge_ratio'].values[0]
+    school = df[(df['country'] == c) & (df['scenario'] == 'no_school')]['cross_edge_ratio'].values[0]
+    work = df[(df['country'] == c) & (df['scenario'] == 'no_work')]['cross_edge_ratio'].values[0]
+    change_data.append({
+        'country': c,
+        'school_change_pct': (school - base) / base * 100,
+        'work_change_pct': (work - base) / base * 100
+    })
+change_df = pd.DataFrame(change_data)
 
-            continue
+x = np.arange(len(countries))
+width = 0.35
+fig, ax = plt.subplots(figsize=(8, 5))
+ax.bar(x - width / 2, change_df['school_change_pct'], width, label='No_school', color='#ff7f0e')
+ax.bar(x + width / 2, change_df['work_change_pct'], width, label='No_work', color='#2ca02c')
+ax.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
+ax.set_xticks(x)
+ax.set_xticklabels(countries)
+ax.set_ylabel('Relative change in cross-age edge ratio (%)')
+ax.set_title('Intervention effect on cross-age connectivity')
+ax.legend()
 
-        df_line    = pd.read_csv(sim_line_file)
-        df_scatter = pd.read_csv(sim_scatter_file)
+# 添加数值标签
+for i, (school, work) in enumerate(zip(change_df['school_change_pct'], change_df['work_change_pct'])):
+    ax.text(i - width / 2, school + 0, f'{school:.1f}%', ha='center',
+            va='bottom' if school > 0 else 'top', fontsize=9)
+    ax.text(i + width / 2, work + (1 if work > 0 else -0.2), f'{work:.1f}%', ha='center',
+            va='bottom' if work > 0 else 'top', fontsize=9)
 
-        beta_line    = df_line['Beta']
-        beta_scatter = df_scatter['Beta']
+plt.tight_layout()
+plt.savefig('cross_edge_relative_change.png', dpi=300, bbox_inches='tight')
+plt.savefig('cross_edge_relative_change.pdf', bbox_inches='tight')
+plt.show()
 
-
-        for age_group in range(max_age_groups):
-            row = age_group // 4
-            col = age_group % 4
-
-            if row >= len(age_axes) or col >= len(age_axes[row]):
-                continue
-
-            ax = age_axes[row][col]
-            col_name = f'R_age{age_group + 1}'
-
-            if col_name not in df_line.columns or col_name not in df_scatter.columns:
-                continue
-
-
-            ax.plot(
-                beta_line,
-                df_line[col_name],
-                color=colors[country_idx],
-                linewidth=2,
-                linestyle='-',
-                alpha=0.8,
-                label=f'{country} (Sim-No_school)' if age_group == 0 else ''
-            )
-
-
-            ax.scatter(
-                beta_scatter,
-                df_scatter[col_name],
-                color=colors[country_idx],
-                marker=markers[country_idx],
-                s=40,
-                alpha=0.8,
-                edgecolor='white',
-                linewidth=0.5,
-                label=f'{country} (Sim–All)' if age_group == 0 else ''
-            )
-
-            if country_idx == 0:
-                ax.set_title(f'Age Group {age_group}', fontsize=14, fontweight='bold')
-
-            if row == 3:
-                ax.set_xlabel(r'$\beta$', fontsize=12)
-            if col == 0:
-                ax.set_ylabel('Final epidemic size', fontsize=12)
-
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(axis='both', which='major', labelsize=10)
-
-
-    plt.suptitle(
-        'Comparison of Two Simulation Schemes by Age Group\n'
-        'Discrete SIR with All Contacts vs Discrete SIR with No_school Contacts',
-        fontsize=16,
-        fontweight='bold',
-        y=0.98
-    )
-
-    legend_fig, legend_ax = plt.subplots(figsize=(10, 2))
-    legend_ax.axis('off')
-
-    legend_elements = []
-    for i, country in enumerate(countries):
-        legend_elements.append(
-            plt.Line2D(
-                [0], [0],
-                color=colors[i],
-                linewidth=3,
-                label=f'{country} (Sim-No_school)'
-            )
-        )
-        legend_elements.append(
-            plt.Line2D(
-                [0], [0],
-                marker=markers[i],
-                color='w',
-                markerfacecolor=colors[i],
-                markersize=10,
-                label=f'{country} (Sim–All)'
-            )
-        )
-
-    legend_ax.legend(
-        handles=legend_elements,
-        loc='center',
-        ncol=4,
-        fontsize=14,
-        frameon=True,
-        fancybox=True
-    )
-
-    plt.tight_layout()
-    plt.savefig('age_group_two_simulation_comparison.png', dpi=300, bbox_inches='tight')
-    legend_fig.savefig('age_group_two_simulation_legend.png', dpi=300, bbox_inches='tight')
-
-    plt.show()
-    plt.close(legend_fig)
-
-
-
-if __name__ == "__main__":
-    plot_age_group_comparison_two_simulations()
+# 可选：生成一个带误差的表格（直接打印）
+print("\n关键指标汇总表（可复制到论文中）")
+print(df[['country', 'scenario', 'cross_edge_ratio', 'avg_path_length', 'mean_degree',
+          'largest_comp_frac']].round(4))

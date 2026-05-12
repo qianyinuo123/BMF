@@ -1,0 +1,67 @@
+# Age-Structured Network SIR Model for Disease Transmission Analysis
+
+## Overview
+
+This project implements an age-structured discrete-time SIR (Susceptible-Infected-Recovered) epidemic model on contact networks. It analyzes disease transmission dynamics across different countries with varying demographic structures, focusing on age-specific infection patterns and network properties.
+
+## Key Features
+
+- **Age-Structured Modeling**: 16 age groups (0-75+ years) with realistic population distributions
+- **Network-Based Simulation**: Contact networks constructed from country-specific demographic data
+- **Multi-Country Comparison**: Analysis of Germany, Uganda, Qatar, and Monaco
+- **Intervention Scenarios**: Baseline, no-school, and no-work intervention models
+- **Comprehensive Visualization**: Chord diagrams, heatmaps, time series, and statistical comparisons
+
+## Project Structure
+
+### Core Scripts
+
+- `network_contruct.py` - Constructs contact networks from population and contact matrix data
+- `age_structured_discrete_SIR_model.py` - Main SIR simulation engine (baseline scenario)
+- `age_structured_discrete_SIR_model_no_school.py` - SIR model with school closure intervention
+- `age_structured_discrete_SIR_model_no_work.py` - SIR model with workplace closure intervention
+- `final_size_calculator.py` - Calculates theoretical final epidemic size using next-generation matrix
+- `age_group_ranking_analysis.py` - Ranks countries by age-group-specific infection rates
+
+### Analysis & Visualization
+
+- `Fig2-chord-heatmap/` - Network structure visualization (chord diagrams and heatmaps)
+  - `Chord diagram.py` - Generates chord diagrams showing inter-age-group connections
+  - `Heatmap.py` - Creates heatmaps of contact matrices
+  - `不同国家年龄组分布分析-new.py` - Age distribution analysis and visualization
+
+- `fig3,fig4/` - Network degree distribution analysis
+  - `degree_distribution_analysis.py` - Analyzes node degree distributions
+  - `degree_distribution_loglog_analysis.py` - Log-log scale degree distribution plots
+
+- `Fig5,Fig6/` - R0 and final size relationship analysis
+  - `fig2,fig3.py` - Plots R0 vs final infection size with statistical annotations
+
+- `Fig8/` - Age group comparison across countries
+  - `Fig8.py` - Comparative analysis of age-specific infection rates
+
+- `Fig9/` - Intervention impact on network structure
+  - `Fig9.py` - Network metrics comparison between interventions
+  - `age_distribution_analysis.py` - Cross-edge relative change analysis
+
+- `Fig11/` - No-school intervention results
+  - `Fig10.py` - Age group comparison under school closure scenario
+
+- `Fig12/` - No-work intervention results
+  - `Fig9.py` - Age group comparison under workplace closure scenario
+
+### Data Directories
+
+- `gexf_networks/` - Generated contact networks (baseline)
+- `gexf_networks_no_school/` - Networks with school connections removed
+- `gexf_networks_no_work/` - Networks with workplace connections removed
+- `population fraction/` - Raw population distribution data (Excel files)
+- `population_fraction_processed_csv/` - Processed population fractions (CSV)
+- `processed_matrices/` - Symmetrized contact matrices (Pickle format)
+- `results_by_country/` - Final size calculation results for all countries
+- `Discrete_SIR_Analysis_Results*/` - SIR simulation outputs for different scenarios
+
+## Installation
+
+### Requirements
+
