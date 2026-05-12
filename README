@@ -1,45 +1,73 @@
 # Age-Structured Network SIR Model for Disease Transmission Analysis
 
 ## Overview
+This repository provides code and data to simulate age-structured SIR epidemics on contact networks, using country-specific demographic data and age-specific contact matrices. It supports:
+- Construction of heterogeneous contact networks (Erdős–Rényi within and between age groups)
+- Stochastic discrete-time SIR simulations on these networks
+- Calculation of theoretical $R_0$ and final epidemic size using an edge-based compartmental model (EBCM)
+- Intervention scenarios: school closure, workplace closure
 
-This project implements an age-structured discrete-time SIR epidemic model on contact networks to analyze disease transmission dynamics across different countries with varying demographic structures.
+## Raw Data Sources and Acknowledgements
+The contact matrices used in this study are derived from Prem et al. (2017), who extended the original **POLYMOD** contact survey data. Please cite both:
 
-## Project Structure
+- **POLYMOD dataset** (original contact survey):  
+ Mossong J, Hens N, Jit M, et al. Social contacts and mixing patterns relevant to the spread of infectious diseases[J]. PLoS medicine, 2008, 5(3): e74.
 
-### Core Scripts
+- **Prem et al. (2017) projection to 152 countries**:  
+  Prem, K., Cook, A. R., & Jit, M. (2017). Projecting social contact matrices in 152 countries using contact surveys and demographic data. *PLoS Computational Biology*, 13(9), e1005697. doi:10.1371/journal.pcbi.1005697
 
-- `network_contruct.py` - Constructs contact networks from population and contact matrix data
-- `age_structured_discrete_SIR_model.py` - Main SIR simulation engine (baseline scenario)
-- `age_structured_discrete_SIR_model_no_school.py` - SIR model with school closure intervention
-- `age_structured_discrete_SIR_model_no_work.py` - SIR model with workplace closure intervention
-- `final_size_calculator.py` - Calculates theoretical final epidemic size
-- `age_group_ranking_analysis.py` - Ranks countries by age-group-specific infection rates
+- **Population age distribution data** (year 2023):  
+  PopulationPyramid.net. [https://www.populationpyramid.net/world/2023/](https://www.populationpyramid.net/world/2023/)
 
-### Visualization Folders
+If you use this code, please also cite this repository (see citation file) and the original papers above.
 
-- `Fig2-chord-heatmap/` - Network structure visualization (chord diagrams and heatmaps)
-- `fig3,fig4/` - Network degree distribution analysis
-- `Fig5,Fig6/` - R0 and final size relationship analysis
-- `Fig8/` - Age group comparison across countries
-- `Fig9/` - Intervention impact on network structure
-- `Fig11/` - No-school intervention results
-- `Fig12/` - No-work intervention results
+### 1. Data Processing (not fully automated – see notes)
+The raw contact matrices (from Prem et al.) and population fractions (from PopulationPyramid) are pre‑processed into:
+- Symmetrised contact matrices (saved in `processed_matrices/`)
+- Cleaned population fractions (saved in `population_fraction_processed_csv/`)
 
-### Data Directories
+Due to licensing restrictions, the raw data are not included in this repository. To obtain them:
+- Contact matrices: Download from [the official repository of Prem et al.](https://doi.org/10.1371/journal.pcbi.1005697) or request from the authors.
+- Population data: Download from [PopulationPyramid.net](https://www.populationpyramid.net/).
 
-- `gexf_networks/` - Generated contact networks (baseline)
-- `gexf_networks_no_school/` - Networks with school connections removed
-- `gexf_networks_no_work/` - Networks with workplace connections removed
-- `population fraction/` - Raw population distribution data (Excel files)
-- `population_fraction_processed_csv/` - Processed population fractions (CSV)
-- `processed_matrices/` - Symmetrized contact matrices (Pickle format)
-- `results_by_country/` - Final size calculation results for all countries
-- `Discrete_SIR_Analysis_Results*/` - SIR simulation outputs for different scenarios
+The processing steps are described in the Methods section of our manuscript. We plan to release a fully automated processing script upon request.
 
+### 2. Network Construction
+`network_contruct.py`  
+Builds age‑structured networks using the symmetrised contact matrix and population fractions. Outputs GEXF files saved in `gexf_networks/`.
 
-Age exposure data are from reference [25].
-[28]	K. Prem, A. R. Cook, and M. Jit, “Projecting social contact matrices in 152 countries using contact surveys and demographic data,” PLoS Comput Biol, vol. 13, no. 9, p. e1005697, Sep. 2017, doi: 10.1371/journal.pcbi.1005697.
+### 3. Epidemic Simulation
+- `age_structured_discrete_SIR_model.py` – baseline scenario (full contact network)
+- `age_structured_discrete_SIR_model_no_school.py` – school closure intervention
+- `age_structured_discrete_SIR_model_no_work.py`   – workplace closure intervention
 
+Each script runs stochastic discrete‑time SIR simulations and outputs per‑country final epidemic sizes, age‑stratified results, and time series.
 
-Age exposure data are from reference [54].
-[54]	“Population Pyramids of the World from 1950 to 2100,” PopulationPyramid.net. Accessed: Feb. 20, 2026. [Online]. Available: https://www.populationpyramid.net/             world/2026/
+### 4. Theoretical Calculations
+`final_size_calculator.py`  
+Computes $R_0$ (next‑generation matrix) and the theoretical final epidemic size from the EBCM model, given the contact matrix and demography.
+
+### 5. Analysis and Visualisation
+- `age_group_ranking_analysis.py` – ranks countries by infection burden in different age groups.
+- `Fig2-chord-heatmap/`, `fig3,fig4/`, … – each folder contains scripts specific to generating the manuscript figures.
+
+### 6. Results Data
+All simulation outputs (final sizes, age‑specific infection fractions) are stored in `results_by_country/` and `Discrete_SIR_Analysis_Results*/` as CSV files.
+
+## How to Reproduce the Main Results
+A typical pipeline would be:
+1. Obtain raw data (see above).
+2. Run `python network_contruct.py` for each country.
+3. Run `python age_structured_discrete_SIR_model.py` (and intervention versions).
+4. Run `python final_size_calculator.py`.
+5. Run analysis scripts under each `Fig*` folder to regenerate figures.
+
+We have also provided pre‑computed results in the `results_by_country/` and `gexf_networks/` directories, so that you can directly explore the outputs without rerunning all simulations.
+
+## Repository Contents (Key Directories)
+- `gexf_networks/` – constructed networks (baseline)
+- `gexf_networks_no_school/`, `gexf_networks_no_work/` – networks under interventions
+- `processed_matrices/` – symmetrised contact matrices (Pickle)
+- `population_fraction_processed_csv/` – population fractions (CSV)
+- `results_by_country/` – theoretical final sizes, R0, etc.
+- `Discrete_SIR_Analysis_Results*/` – simulation outputs
