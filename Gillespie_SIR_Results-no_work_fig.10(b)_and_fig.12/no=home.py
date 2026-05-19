@@ -1,6 +1,11 @@
+# ============================================================
+# Gillespie 年龄结构 SIR 模型（多进程并行版 - 内存优化）
+# ============================================================
+
 import numpy as np
 import pandas as pd
 import networkx as nx
+import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 import warnings
@@ -12,58 +17,73 @@ import random
 warnings.filterwarnings('ignore')
 
 
+# ============================================================
+# 模块级函数：单个 beta 值模拟（优化内存版）
+# ============================================================
+
 def simulate_one_beta(model, G, beta, n_simulations, initial_infected_fraction):
-    seed = (os.getpid() * int(time.time())) % (2**32)
+    """
+    对单个 beta 值执行 n_simulations 次独立模拟，返回统计结果（不存储完整轨迹）。
+    """
+    # 为每个子进程设置不同的随机种子
+    seed = (os.getpid() * int(time.time())) % (2 ** 32)
     np.random.seed(seed)
     random.seed(seed)
 
-    beta_results = {
-        'beta': beta,
-        'R0': beta / model.gamma,
-        'simulations': []
-    }
-
+    # 存储统计量（不存储完整模拟历史）
     infected_ratios = []
     R_all_values = []
 
+    # 存储每个年龄组的最终感染比例（所有模拟）
+    age_infections_all = {age: [] for age in range(16)}
+    # 存储四大年龄组的最终感染比例（所有模拟）
+    four_group_values = {
+        "0-19": [],
+        "20-39": [],
+        "40-59": [],
+        "60+": []
+    }
+
+    # 执行 n_simulations 次模拟
     for _ in range(n_simulations):
         sim_result = model.gillespie_sir_simulation(
             G, beta, initial_infected_fraction
         )
-        beta_results['simulations'].append(sim_result)
         infected_ratios.append(sim_result['final_infected_ratio'])
         R_all_values.append(sim_result['R_all_weighted'])
 
+        # 收集年龄组感染比例
+        for age in range(16):
+            if age in sim_result['final_age_stats']:
+                age_infections_all[age].append(
+                    sim_result['final_age_stats'][age]['R_final']
+                )
+            else:
+                age_infections_all[age].append(0.0)
+
+        # 收集四大年龄组感染比例
+        for gname in four_group_values.keys():
+            four_group_values[gname].append(
+                sim_result['four_group_stats'][gname]['R_final']
+            )
+
+    # ================= 总体统计 =================
     mean_val = np.mean(infected_ratios)
     sd_val = np.std(infected_ratios, ddof=1)
     ci95 = 1.96 * sd_val / np.sqrt(len(infected_ratios))
 
-    beta_results['mean_infected_ratio'] = mean_val
-    beta_results['std_infected_ratio'] = sd_val
-    beta_results['sd_infected_ratio'] = sd_val
-    beta_results['ci95_low'] = mean_val - ci95
-    beta_results['ci95_high'] = mean_val + ci95
-    beta_results['min_infected_ratio'] = np.min(infected_ratios)
-    beta_results['max_infected_ratio'] = np.max(infected_ratios)
-    beta_results['median_infected_ratio'] = np.median(infected_ratios)
-    beta_results['mean_R_all'] = np.mean(R_all_values)
-
+    # ================= 16 个年龄组统计 =================
     age_infected_means = {}
     age_infected_sds = {}
     age_infected_ci95_low = {}
     age_infected_ci95_high = {}
 
     for age in range(16):
-        age_infections = []
-        for sim_result in beta_results['simulations']:
-            if age in sim_result['final_age_stats']:
-                age_infections.append(
-                    sim_result['final_age_stats'][age]['R_final']
-                )
-        if len(age_infections) > 0:
-            mean_age = np.mean(age_infections)
-            sd_age = np.std(age_infections, ddof=1)
-            ci95_age = 1.96 * sd_age / np.sqrt(len(age_infections))
+        values = age_infections_all[age]
+        if len(values) > 0:
+            mean_age = np.mean(values)
+            sd_age = np.std(values, ddof=1)
+            ci95_age = 1.96 * sd_age / np.sqrt(len(values))
             age_infected_means[age] = mean_age
             age_infected_sds[age] = sd_age
             age_infected_ci95_low[age] = mean_age - ci95_age
@@ -74,18 +94,11 @@ def simulate_one_beta(model, G, beta, n_simulations, initial_infected_fraction):
             age_infected_ci95_low[age] = 0.0
             age_infected_ci95_high[age] = 0.0
 
-    beta_results['age_infected_means'] = age_infected_means
-    beta_results['age_infected_sds'] = age_infected_sds
-    beta_results['age_infected_ci95_low'] = age_infected_ci95_low
-    beta_results['age_infected_ci95_high'] = age_infected_ci95_high
-
+    # ================= 4 大年龄组统计 =================
     group_names = ["0-19", "20-39", "40-59", "60+"]
     four_group_summary = {}
     for gname in group_names:
-        values = [
-            sim['four_group_stats'][gname]['R_final']
-            for sim in beta_results['simulations']
-        ]
+        values = four_group_values[gname]
         mean_g = np.mean(values)
         sd_g = np.std(values, ddof=1)
         ci95_g = 1.96 * sd_g / np.sqrt(len(values))
@@ -95,31 +108,64 @@ def simulate_one_beta(model, G, beta, n_simulations, initial_infected_fraction):
             'ci95_low': mean_g - ci95_g,
             'ci95_high': mean_g + ci95_g
         }
-    beta_results['four_group_summary'] = four_group_summary
 
+    # 构建返回结果（不包含 simulations 列表，只包含统计量）
+    beta_results = {
+        'beta': beta,
+        'R0': beta / model.gamma,
+        'mean_infected_ratio': mean_val,
+        'std_infected_ratio': sd_val,
+        'sd_infected_ratio': sd_val,
+        'ci95_low': mean_val - ci95,
+        'ci95_high': mean_val + ci95,
+        'min_infected_ratio': np.min(infected_ratios),
+        'max_infected_ratio': np.max(infected_ratios),
+        'median_infected_ratio': np.median(infected_ratios),
+        'mean_R_all': np.mean(R_all_values),
+        'age_infected_means': age_infected_means,
+        'age_infected_sds': age_infected_sds,
+        'age_infected_ci95_low': age_infected_ci95_low,
+        'age_infected_ci95_high': age_infected_ci95_high,
+        'four_group_summary': four_group_summary,
+        # 为了兼容原有保存函数，添加一个空的 simulations 列表
+        'simulations': []
+    }
     return beta_results
 
 
+# ============================================================
+# 年龄结构 SIR 模型类（保持不变，除了绘图部分）
+# ============================================================
+
 class AgeStructuredSIRModel:
+    """
+    基于年龄结构的 Gillespie-SIR 模型
+    """
 
     def __init__(self, gamma=0.1, max_time=200):
         self.gamma = gamma
         self.max_time = max_time
 
+    # ------------------------------------------------------------
+    # 加载网络
+    # ------------------------------------------------------------
     def load_network(self, country, networks_folder):
         network_path = os.path.join(networks_folder, f"{country}.gexf")
         if not os.path.exists(network_path):
-            print(f"Network file not found: {network_path}")
+            print(f"❌ 网络文件不存在: {network_path}")
             return None
         try:
             G = nx.read_gexf(network_path)
             G = nx.convert_node_labels_to_integers(G)
-            print(f"Loaded {country} network: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+            print(f"✅ 加载 {country} 网络: {G.number_of_nodes()} 个节点, {G.number_of_edges()} 条边")
             return G
         except Exception as e:
-            print(f"Failed to load network: {e}")
+            print(f"❌ 加载网络失败: {e}")
             return None
 
+    # ------------------------------------------------------------
+    # 提取年龄组
+    # ------------------------------------------------------------
     def extract_age_groups(self, G):
         age_groups = {}
         for node in G.nodes():
@@ -136,6 +182,9 @@ class AgeStructuredSIRModel:
                 age_groups[node] = 0
         return age_groups
 
+    # ------------------------------------------------------------
+    # Gillespie 连续时间 SIR 模拟（原版，未改动）
+    # ------------------------------------------------------------
     def gillespie_sir_simulation(self, G, beta, initial_infected_fraction=0.001):
         N = G.number_of_nodes()
         status = np.zeros(N, dtype=np.int8)
@@ -268,11 +317,14 @@ class AgeStructuredSIRModel:
             'age_groups': age_groups
         }
 
+    # ------------------------------------------------------------
+    # 单国家分析（多进程并行版）
+    # ------------------------------------------------------------
     def run_single_country_analysis(self, country, networks_folder, beta_values,
                                     n_simulations=50, initial_infected_fraction=0.001,
                                     max_workers=None):
         print(f"\n{'=' * 60}")
-        print(f"Analyzing: {country}")
+        print(f"开始分析: {country}")
         print(f"{'=' * 60}")
 
         G = self.load_network(country, networks_folder)
@@ -281,7 +333,7 @@ class AgeStructuredSIRModel:
 
         N = G.number_of_nodes()
         avg_degree = np.mean([d for n, d in G.degree()])
-        print(f"Network info: {N} nodes, mean degree: {avg_degree:.2f}")
+        print(f"网络信息: {N} 个节点, 平均度: {avg_degree:.2f}")
 
         age_groups = self.extract_age_groups(G)
         age_distribution = {}
@@ -289,7 +341,7 @@ class AgeStructuredSIRModel:
             count = sum(1 for ag in age_groups.values() if ag == age)
             if count > 0:
                 age_distribution[age] = count
-        print(f"Age distribution: {age_distribution}")
+        print(f"年龄组分布: {age_distribution}")
 
         results = {
             'country': country,
@@ -303,7 +355,7 @@ class AgeStructuredSIRModel:
 
         if max_workers is None:
             max_workers = multiprocessing.cpu_count()
-        print(f"Using {max_workers} processes for {len(beta_values)} beta values")
+        print(f"使用 {max_workers} 个进程并行处理 {len(beta_values)} 个 beta 值")
 
         args_list = [
             (self, G, beta, n_simulations, initial_infected_fraction)
@@ -318,7 +370,7 @@ class AgeStructuredSIRModel:
             }
             for future in tqdm(cf.as_completed(future_to_beta),
                                total=len(beta_values),
-                               desc=f"Parallel simulation - {country}"):
+                               desc=f"并行模拟 - {country}"):
                 beta_results_list.append(future.result())
 
         beta_results_list.sort(key=lambda x: x['beta'])
@@ -331,6 +383,9 @@ class AgeStructuredSIRModel:
 
         return results
 
+    # ------------------------------------------------------------
+    # 多国家运行
+    # ------------------------------------------------------------
     def run_multiple_countries(self, countries, networks_folder, beta_values,
                                n_simulations=50, output_folder="results",
                                max_workers=None):
@@ -339,7 +394,7 @@ class AgeStructuredSIRModel:
 
         for country in countries:
             print(f"\n{'=' * 60}")
-            print(f"Processing: {country}")
+            print(f"处理国家: {country}")
             print(f"{'=' * 60}")
 
             country_results = self.run_single_country_analysis(
@@ -351,9 +406,16 @@ class AgeStructuredSIRModel:
                 all_results[country] = country_results
                 self.save_country_results(country_results, output_folder)
                 self.save_four_group_results(country_results, output_folder)
+                self.generate_country_report(country_results, output_folder)
+
+        if len(all_results) > 1:
+            self.generate_comparison_report(all_results, output_folder)
 
         return all_results
 
+    # ------------------------------------------------------------
+    # 保存原始 CSV（含 SD 和 95% CI）
+    # ------------------------------------------------------------
     def save_country_results(self, country_results, output_folder):
         country = country_results['country']
         beta_results = country_results['beta_results']
@@ -371,45 +433,149 @@ class AgeStructuredSIRModel:
                 'mean_R_all': br['mean_R_all']
             }
             for age in range(16):
-                row[f'R_age{age+1}'] = br['age_infected_means'].get(age, 0.0)
-                row[f'R_age{age+1}_sd'] = br['age_infected_sds'].get(age, 0.0)
-                row[f'R_age{age+1}_ci95_low'] = br['age_infected_ci95_low'].get(age, 0.0)
-                row[f'R_age{age+1}_ci95_high'] = br['age_infected_ci95_high'].get(age, 0.0)
+                row[f'R_age{age + 1}'] = br['age_infected_means'].get(age, 0.0)
+                row[f'R_age{age + 1}_sd'] = br['age_infected_sds'].get(age, 0.0)
+                row[f'R_age{age + 1}_ci95_low'] = br['age_infected_ci95_low'].get(age, 0.0)
+                row[f'R_age{age + 1}_ci95_high'] = br['age_infected_ci95_high'].get(age, 0.0)
             data_rows.append(row)
 
         df = pd.DataFrame(data_rows)
         csv_file = os.path.join(output_folder, f"Gillespie_SIR_{country}.csv")
         df.to_csv(csv_file, index=False)
-        print(f"Results saved: {csv_file}")
+        print(f"✅ 结果已保存: {csv_file}")
         return csv_file
 
+    # ------------------------------------------------------------
+    # 保存 4 大年龄组 CSV（直接使用预计算统计量）
+    # ------------------------------------------------------------
     def save_four_group_results(self, country_results, output_folder):
         country = country_results['country']
         rows = []
         for br in country_results['beta_results']:
-            sims = br['simulations']
             row = {'Beta': br['beta']}
             group_names = ["0-19", "20-39", "40-59", "60+"]
             for gname in group_names:
-                values = [sim['four_group_stats'][gname]['R_final'] for sim in sims]
-                mean_val = np.mean(values)
-                sd_val = np.std(values, ddof=1)
-                ci95 = 1.96 * sd_val / np.sqrt(len(values))
-                row[f'{gname}_mean'] = mean_val
-                row[f'{gname}_sd'] = sd_val
-                row[f'{gname}_ci95_low'] = mean_val - ci95
-                row[f'{gname}_ci95_high'] = mean_val + ci95
+                stats = br['four_group_summary'][gname]
+                row[f'{gname}_mean'] = stats['mean']
+                row[f'{gname}_sd'] = stats['sd']
+                row[f'{gname}_ci95_low'] = stats['ci95_low']
+                row[f'{gname}_ci95_high'] = stats['ci95_high']
             rows.append(row)
         df = pd.DataFrame(rows)
         save_path = os.path.join(output_folder, f"Gillespie_4AgeGroups_{country}.csv")
         df.to_csv(save_path, index=False)
-        print(f"Four age groups results saved: {save_path}")
+        print(f"✅ 四年龄组结果保存: {save_path}")
+
+    # ------------------------------------------------------------
+    # 单国家报告（绘图，要求4个子图代替热图）
+    # ------------------------------------------------------------
+    def generate_country_report(self, country_results, output_folder):
+        country = country_results['country']
+        beta_results = country_results['beta_results']
+
+        betas = [br['beta'] for br in beta_results]
+        mean_infected = [br['mean_infected_ratio'] for br in beta_results]
+        sd_infected = [br['std_infected_ratio'] for br in beta_results]
+        ci95_low = [br['ci95_low'] for br in beta_results]
+        ci95_high = [br['ci95_high'] for br in beta_results]
+
+        plt.figure(figsize=(16, 12))
+
+        # 子图1：最终感染规模
+        plt.subplot(2, 2, 1)
+        plt.plot(betas, mean_infected, linewidth=2, label='Mean Infection Ratio')
+        plt.fill_between(betas, np.array(mean_infected) - np.array(sd_infected),
+                         np.array(mean_infected) + np.array(sd_infected),
+                         alpha=0.25, label='Mean ± SD')
+        plt.fill_between(betas, ci95_low, ci95_high, alpha=0.2, label='95% CI')
+        for i, val in enumerate(mean_infected):
+            if val > 0.01:
+                beta_threshold = betas[i]
+                plt.axvline(beta_threshold, linestyle='--', linewidth=2,
+                            label=f'Threshold≈{beta_threshold:.3f}')
+                break
+        plt.xlabel('Transmission Rate β', fontsize=12)
+        plt.ylabel('Final Epidemic Size', fontsize=12)
+        plt.title(f'{country} Gillespie-SIR', fontsize=14)
+        plt.grid(alpha=0.3)
+        plt.legend()
+
+        # 子图2：时间序列示例（使用第一次模拟的轨迹，但我们已经不存储轨迹了，所以需要重新运行一次？）
+        # 为了不增加复杂度，这里可以跳过或使用一个占位图。我们改为显示一个说明。
+        plt.subplot(2, 2, 2)
+        plt.text(0.5, 0.5, 'Trajectory plot omitted\nfor memory efficiency',
+                 ha='center', va='center', transform=plt.gca().transAxes, fontsize=12)
+        plt.axis('off')
+        # 原本需要轨迹数据，现在不再存储，所以简化显示。如需保留，可以单独运行一次示例模拟。
+
+        # 子图3：四大年龄组（四个小图）
+        from matplotlib.gridspec import GridSpecFromSubplotSpec
+        plt.subplot(2, 2, 3)
+        plt.cla()
+        gs = GridSpecFromSubplotSpec(2, 2, subplot_spec=plt.gca().get_subplotspec(), wspace=0.3, hspace=0.3)
+        group_names = ["0-19", "20-39", "40-59", "60+"]
+        colors = ['blue', 'orange', 'green', 'red']
+        for idx, gname in enumerate(group_names):
+            ax = plt.subplot(gs[idx])
+            means = [br['four_group_summary'][gname]['mean'] for br in beta_results]
+            sds = [br['four_group_summary'][gname]['sd'] for br in beta_results]
+            ax.plot(betas, means, linewidth=2, color=colors[idx])
+            ax.fill_between(betas, np.array(means) - np.array(sds),
+                            np.array(means) + np.array(sds), alpha=0.2, color=colors[idx])
+            ax.set_title(gname, fontsize=10)
+            ax.set_xlabel('β', fontsize=9)
+            ax.set_ylabel('Recovered Fraction', fontsize=9)
+            ax.grid(alpha=0.3)
+        plt.suptitle('Four Age Groups (Mean ± SD)', fontsize=12)
+
+        # 子图4：四大年龄组汇总曲线（保留原风格，可选）
+        plt.subplot(2, 2, 4)
+        for gname in group_names:
+            means = [br['four_group_summary'][gname]['mean'] for br in beta_results]
+            sds = [br['four_group_summary'][gname]['sd'] for br in beta_results]
+            plt.plot(betas, means, linewidth=2, label=gname)
+            plt.fill_between(betas, np.array(means) - np.array(sds),
+                             np.array(means) + np.array(sds), alpha=0.15)
+        plt.xlabel('Transmission Rate β', fontsize=12)
+        plt.ylabel('Recovered Fraction', fontsize=12)
+        plt.title('Four Large Age Groups (Comparison)', fontsize=14)
+        plt.grid(alpha=0.3)
+        plt.legend()
+
+        plt.tight_layout()
+        save_path = os.path.join(output_folder, f"Gillespie_Report_{country}.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ 图已保存: {save_path}")
+
+    # ------------------------------------------------------------
+    # 多国家比较图
+    # ------------------------------------------------------------
+    def generate_comparison_report(self, all_results, output_folder):
+        plt.figure(figsize=(14, 10))
+        for country, results in all_results.items():
+            betas = [br['beta'] for br in results['beta_results']]
+            means = [br['mean_infected_ratio'] for br in results['beta_results']]
+            plt.plot(betas, means, linewidth=2, label=country)
+        plt.xlabel('Transmission Rate β', fontsize=12)
+        plt.ylabel('Final Epidemic Size', fontsize=12)
+        plt.title('Multi-country Gillespie-SIR Comparison', fontsize=15)
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        save_path = os.path.join(output_folder, "MultiCountry_Comparison.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ 多国家比较图已保存")
 
 
+# ============================================================
+# main 函数
+# ============================================================
 def main():
-    networks_folder = "gexf_networks"
-    output_folder = "Gillespie_SIR_Results_all_fig.7_and_fig.8"
-    selected_countries = ["Uganda", "Qatar", "Monaco", "Germany"]
+    networks_folder = "gexf_networks-泊松-151-第二种组间连接——10000-没有工作"
+    output_folder = "Gillespie_SIR_Results-没有工作"
+    selected_countries = ["Qatar"]  # 可改为 ["Uganda", "Qatar", "Monaco", "Germany"]
 
     gamma = 1 / 3
     initial_infected_fraction = 0.001
@@ -417,14 +583,14 @@ def main():
 
     beta_min = 0.0
     beta_max = 0.4
-    num_beta = 101
+    num_beta = 101  # 可以增加到401，但建议先用101测试
     beta_values = np.linspace(beta_min, beta_max, num_beta)
 
     n_simulations = 30
-    max_workers = multiprocessing.cpu_count()
+    max_workers = 30  # 降低并发数以避免内存压力（可根据实际内存调整）
 
     print("=" * 70)
-    print("Age-structured Gillespie-SIR Model (Multi-process Parallel Version)")
+    print("年龄结构 Gillespie-SIR 模型（多进程并行版 - 内存优化）")
     print("=" * 70)
     print(f"gamma = {gamma}")
     print(f"initial infected fraction = {initial_infected_fraction}")
@@ -433,7 +599,7 @@ def main():
     print(f"beta number = {num_beta}")
     print(f"independent realizations = {n_simulations}")
     print(f"countries = {selected_countries}")
-    print(f"parallel processes = {max_workers}")
+    print(f"并行进程数 = {max_workers}")
     print("=" * 70)
 
     model = AgeStructuredSIRModel(gamma=gamma, max_time=max_time)
@@ -449,13 +615,13 @@ def main():
         )
 
         print("\n" + "=" * 70)
-        print("Analysis completed!")
+        print("分析完成！")
         print("=" * 70)
 
         if all_results:
-            print("\nSummary statistics:")
+            print("\n总结统计")
             print("-" * 70)
-            print(f"{'Country':<10}{'Nodes':<12}{'Mean degree':<12}{'Threshold β':<12}")
+            print(f"{'国家':<10}{'节点数':<12}{'平均度':<12}{'阈值β':<12}")
             print("-" * 70)
             for country, results in all_results.items():
                 beta_results = results['beta_results']
@@ -469,10 +635,10 @@ def main():
                 net_info = results['network_info']
                 threshold_str = f"{threshold:.4f}" if threshold is not None else "N/A"
                 print(f"{country:<10}{net_info['N']:<12,}{net_info['avg_degree']:<12.2f}{threshold_str:<12}")
-        print(f"\nAll results saved to: {output_folder}")
+        print(f"\n✅ 所有结果已保存到: {output_folder}")
 
     except Exception as e:
-        print(f"\nRun failed: {e}")
+        print(f"\n❌ 运行失败: {e}")
         import traceback
         traceback.print_exc()
 
