@@ -37,11 +37,9 @@ This project implements an age-structured discrete-time SIR epidemic model on co
 - `Gillespie_SIR_Results*/` - SIR simulation outputs for different scenarios
 
 
-Acknowledgements and citations:
-
-Age exposure data are from reference.
+Age exposure data are from reference .
 K. Prem, A. R. Cook, and M. Jit, “Projecting social contact matrices in 152 countries using contact surveys and demographic data,” PLoS Comput Biol, vol. 13, no. 9, p. e1005697, Sep. 2017, doi: 10.1371/journal.pcbi.1005697.
 J. Mossong et al., “Social Contacts and Mixing Patterns Relevant to the Spread of Infectious Diseases,” PLoS Med, vol. 5, no. 3, p. e74, Mar. 2008, doi: 10.1371/journal.pmed.0050074.
 
-Age distribution data are from reference.
+Age exposure data are from reference .
 “Population Pyramids of the World from 1950 to 2100,” PopulationPyramid.net. Accessed: Feb. 20, 2026. [Online]. Available: https://www.populationpyramid.net/             world/2026/
